@@ -15,7 +15,7 @@ type patternFinder struct {
 
 type SymbolData struct {
 	Symbol    string
-	PriceData []IData
+	PriceData []dataTypes.IData
 }
 
 func NewPatternFinder(params []byte) *patternFinder {
@@ -28,7 +28,7 @@ func (pf *patternFinder) getSearchingRange() ISearchingRange {
 
 	return pf.SearchingRange
 }
-func (pf *patternFinder) scanPatterns(symbol string, data []IData) {
+func (pf *patternFinder) scanPatterns(symbol string, data []dataTypes.IData) {
 	dr, _ := time.ParseDuration("10ms")
 	time.Sleep(dr)
 }
@@ -41,7 +41,7 @@ func (pf *patternFinder) workingRoutine(dataChannel chan SymbolData) {
 func (pf *patternFinder) getSymbolTimeRange(symbol string, tr *TimeRange) *TimeRange {
 	return tr
 }
-func (pf *patternFinder) getPriceDataOf(symbol string, tr *TimeRange) []IData {
+func (pf *patternFinder) getPriceDataOf(symbol string, tr *TimeRange) []dataTypes.IData {
 	dr, _ := time.ParseDuration("1ms")
 	time.Sleep(dr)
 	return nil

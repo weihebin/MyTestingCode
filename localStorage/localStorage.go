@@ -1,17 +1,25 @@
 package localStorage
 
 import (
+	"MyTestingCode/dataTypes"
 	"os"
 	"path"
 	"time"
 )
 
+type IRemoteDataSource interface {
+	Subscribe(symbol string, sDate, eDate time.Time, onData func(dataTypes.IData)) error
+}
+type ILocalStorage interface {
+	SetTimeRange(sDate, eDate time.Time) error
+	LoadData(symbol string) error
+}
 type ICacheDataConsumer interface {
 	// localStorage call this method to query each user to get the last date it need to keep cache for.
-	GetLastDateNeed(tableName string) time.Time
-	GetTables() []string
-	GetColumns(tableName string) []string
-	GetPrereadCount(tableName string) int
+	// GetLastDateNeed(tableName string) time.Time
+	// GetTables() []string
+	// GetColumns(tableName string) []string
+	// GetPrereadCount(tableName string) int
 }
 
 // HW: Testing connectionpool, pre-read cache, allow multple read , single write, clean up
@@ -19,6 +27,13 @@ type localStorage struct {
 	consumers []ICacheDataConsumer
 }
 
+func (ls *localStorage) SetTimeRange(sDate, eDate time.Time) error {
+	return nil
+}
+func NewLocalStorage(symbol string) ILocalStorage {
+	result := &localStorage{}
+	return result
+}
 func (ls *localStorage) getLocation(symbol string) string {
 	rootPath := os.Getenv("LOCAL_STORAGE_ROOT")
 
@@ -33,13 +48,13 @@ func (ls *localStorage) getLocation(symbol string) string {
 
 	return path.Join(rootPath, string(firstRune), symbol)
 }
-func (ls *localStorage) LoadData(symbol string) {
+func (ls *localStorage) LoadData(symbol string) error {
 	path := ls.getLocation(symbol)
 
 	ls.createIfNotExists(path)
 
 	ls.startConnectionPool()
-
+	return nil
 }
 
 func (ls *localStorage) createIfNotExists(path string) {

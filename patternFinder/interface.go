@@ -15,6 +15,3 @@ type ISearchingRange interface {
 }
 type IPattern interface {
 }
-
-type IData interface {
-}
