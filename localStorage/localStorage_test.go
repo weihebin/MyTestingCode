@@ -1,8 +1,11 @@
 package localStorage
 
 import (
+	"MyTestingCode/priceData"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_localStorage_getLocation(t *testing.T) {
@@ -13,7 +16,7 @@ func Test_localStorage_getLocation(t *testing.T) {
 	}
 	tests := []struct {
 		name string
-		ls   *localStorage
+		ls   *sqliteLocalStorage
 		args args
 		want string
 	}{
@@ -21,7 +24,7 @@ func Test_localStorage_getLocation(t *testing.T) {
 			name: "GetLocation",
 			ls:   ls,
 			args: args{symbol: "abcd"},
-			want: "root/a/abcd",
+			want: "root/a/abcd/abcd.db",
 		},
 	}
 	for _, tt := range tests {
@@ -32,27 +35,44 @@ func Test_localStorage_getLocation(t *testing.T) {
 		})
 	}
 }
-func setupTestLocalStorage() *localStorage {
+func setupTestLocalStorage() *sqliteLocalStorage {
 	os.Setenv("LOCAL_STORAGE_ROOT", "C:/Users/hwei/AppData/Local/Temp/")
 
-	return &localStorage{}
+	return &sqliteLocalStorage{}
 
 }
 
 type testColumn struct {
-	name string
+	catalog   string
+	name      string
+	value     interface{}
+	valueType priceData.DataValueType
 }
 
-func getTestingColumn(name string) ICacheDataConsumer {
+func (tc *testColumn) GetName() string {
+	return tc.name
+}
+func (tc *testColumn) GetCatalog() string {
+	return tc.catalog
+}
+func (tc *testColumn) GetValueType() priceData.DataValueType {
+	return tc.valueType
+}
+func getTestingColumn(name string) ILocalStorageDataInfo {
 	switch name {
 	case "Closed":
-		return &testColumn{name: name}
+		return &testColumn{name: name, valueType: priceData.DataValueType_Decimal}
 	}
 	return nil
 }
 func TestHappyPath(t *testing.T) {
 	ls := setupTestLocalStorage()
 
-	ls.RegisterCacheConsumer(getTestingColumn("Closed"))
+	ls.Register(getTestingColumn("Closed"))
+
+	err := ls.LoadData("NVDA")
+	defer ls.Close()
+	assert.Nil(t, err)
+	assert.NotNil(t, ls.database)
 
 }
