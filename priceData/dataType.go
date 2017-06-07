@@ -1,14 +1,16 @@
 package priceData
 
+import (
+	"time"
+)
+
 type IData interface {
 }
 
-type DataValueType string
-
-const (
-	DataValueType_Decimal DataValueType = "Decimal"
-	DataValueType_String                = "String"
-)
+type TimeRange struct {
+	SDate time.Time
+	EDate time.Time
+}
 
 func NewData() IData {
 	return nil

@@ -1,11 +1,15 @@
 package localStorage
 
 import (
+	"MyTestingCode/constants"
 	"MyTestingCode/priceData"
+	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"path"
 	"time"
+
 	// load sqlite driver
 	"log"
 
@@ -15,19 +19,22 @@ import (
 )
 
 type ILocalStorage interface {
-	Register(dataInfo ILocalStorageDataInfo) error
+	GetLastDateOfColumn(catalog constants.ColumnCatalog, columnName string) time.Time
+	SubscribeColumnData(ctx context.Context, timeRange priceData.TimeRange, catalog constants.ColumnCatalog, columns []string, onData func(*time.Time, priceData.IData)) error
+	AddOrUpdateValues(catalog constants.ColumnCatalog, columnsName []string, date *time.Time, values priceData.IData) error
+	RegisterColumn(catalog constants.ColumnCatalog, columnName string, valueType constants.DataValueType) error
 	LoadData(symbol string) error
 	io.Closer
 }
-type ILocalStorageDataInfo interface {
-	GetCatalog() string
-	GetName() string
-	GetValueType() priceData.DataValueType
+type dataInfo struct {
+	Catalog   constants.ColumnCatalog
+	Name      string
+	ValueType constants.DataValueType
 }
 
 // HW: Testing connectionpool, pre-read cache, allow multple read , single write, clean up
 type sqliteLocalStorage struct {
-	tables   map[string]map[string]ILocalStorageDataInfo
+	tables   map[constants.ColumnCatalog]map[string]dataInfo
 	database *sql.DB
 }
 
@@ -60,16 +67,37 @@ func (ls *sqliteLocalStorage) LoadData(symbol string) (err error) {
 
 	err = ls.createIfNotExists(path)
 	if nil == err {
-		ls.updateTables()
-		ls.startConnectionPool()
+		err = ls.updateTables()
+		if nil == err {
+			ls.startConnectionPool()
+		}
 	}
 	return err
 }
-func (ls *sqliteLocalStorage) updateTables() (err error) {
-	_, err = ls.database.Exec("CREATE TABLE `customers` (`till_id` INTEGER PRIMARY KEY AUTOINCREMENT, `client_id` VARCHAR(64) NULL, `first_name` VARCHAR(255) NOT NULL, `last_name` VARCHAR(255) NOT NULL, `guid` VARCHAR(255) NULL, `dob` DATETIME NULL, `type` VARCHAR(1))")
-	if err != nil {
-		log.Println(err)
+func getDataType(cDataType constants.DataValueType) string {
+	switch cDataType {
+	case constants.DataValueType_Decimal:
+		return "decimal(20,5)"
+
 	}
+	return "text"
+}
+func (ls *sqliteLocalStorage) updateTables() (err error) {
+
+	for tableName, columns := range ls.tables {
+		// create table if not exist
+		sql := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v ( Year INTEGER NOT NULL, Month INTEGER NOT NULL,Day INTEGER NOT NULL, PRIMARY KEY ( Year,Month,Day ) );", tableName)
+		_, err = ls.database.Exec(sql)
+		if err != nil {
+			log.Println(err)
+		}
+		for columnName, columnInfo := range columns {
+			// append column to table if not exists
+			sql = fmt.Sprintf("ALTER TABLE %v ADD COLUMN %v %v", tableName, columnName, getDataType(columnInfo.ValueType))
+			ls.database.Exec(sql) // err != nil if duplicate
+		}
+	}
+
 	return err
 }
 func (ls *sqliteLocalStorage) createIfNotExists(filename string) (err error) {
@@ -95,25 +123,53 @@ func (ls *sqliteLocalStorage) SetMaxConnection() {
 func (ls *sqliteLocalStorage) startConnectionPool() {
 
 }
-func (ls *sqliteLocalStorage) Register(dataInfo ILocalStorageDataInfo) error {
+func (ls *sqliteLocalStorage) RegisterColumn(catalog constants.ColumnCatalog, columnName string, valueType constants.DataValueType) error {
 	if nil == ls.tables {
-		ls.tables = make(map[string]map[string]ILocalStorageDataInfo)
+		ls.tables = make(map[constants.ColumnCatalog]map[string]dataInfo)
 	}
-	if _, Found := ls.tables[dataInfo.GetCatalog()]; !Found {
-		ls.tables[dataInfo.GetCatalog()] = make(map[string]ILocalStorageDataInfo)
+	if _, Found := ls.tables[catalog]; !Found {
+		ls.tables[catalog] = make(map[string]dataInfo)
 	}
-	ls.tables[dataInfo.GetCatalog()][dataInfo.GetName()] = dataInfo
-	// setup the columns for table
-	// setup the pre-read count for table
+	ls.tables[catalog][columnName] = dataInfo{Catalog: catalog, Name: columnName, ValueType: valueType}
 	return nil
 
 }
+func (ls *sqliteLocalStorage) GetLastDateOfColumn(catalog constants.ColumnCatalog, columnName string) time.Time {
+
+	sqlStr := fmt.Sprintf("select max(Year * 10000 + Month * 100 + Day) from %v where %v is not null;", catalog, columnName)
+
+	rows, err := ls.database.Query(sqlStr)
+	if nil != err {
+		log.Println(err)
+	}
+	var maxDate sql.NullInt64
+	if nil != rows && rows.Next() {
+		err = rows.Scan(&maxDate)
+		if nil != err {
+			log.Println(err)
+		}
+	}
+	if maxDate.Valid {
+		v, _ := maxDate.Value()
+		println(v)
+		val := (int)(v.(int64))
+		println(val)
+		return time.Date(val/10000, (time.Month)((val%10000)/100), val%100, 0, 0, 0, 0, time.UTC)
+	} else {
+		return time.Time{}
+	}
+}
+func (ls *sqliteLocalStorage) SubscribeColumnData(ctx context.Context, timeRange priceData.TimeRange, catalog constants.ColumnCatalog, columns []string, onData func(*time.Time, priceData.IData)) error {
+	return nil
+}
+func (ls *sqliteLocalStorage) AddOrUpdateValues(catalog constants.ColumnCatalog, columnsName []string, date *time.Time, values priceData.IData) error {
+	return nil
+}
+
 func (ls *sqliteLocalStorage) cacheMaintainWorker() {
 	// check each cache for lowerness
 	// read if too low
-
 }
-
 func (ls *sqliteLocalStorage) readFromCache(columnName, tableName string, date time.Time) interface{} {
 	// check if current cache has the date
 	// if not,  pre-read

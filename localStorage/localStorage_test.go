@@ -1,7 +1,9 @@
 package localStorage
 
 import (
-	"MyTestingCode/priceData"
+	"MyTestingCode/constants"
+	"fmt"
+
 	"os"
 	"testing"
 
@@ -43,36 +45,56 @@ func setupTestLocalStorage() *sqliteLocalStorage {
 }
 
 type testColumn struct {
-	catalog   string
+	catalog   constants.ColumnCatalog
 	name      string
 	value     interface{}
-	valueType priceData.DataValueType
+	valueType constants.DataValueType
 }
 
 func (tc *testColumn) GetName() string {
 	return tc.name
 }
-func (tc *testColumn) GetCatalog() string {
+func (tc *testColumn) GetCatalog() constants.ColumnCatalog {
 	return tc.catalog
 }
-func (tc *testColumn) GetValueType() priceData.DataValueType {
+func (tc *testColumn) GetValueType() constants.DataValueType {
 	return tc.valueType
 }
-func getTestingColumn(name string) ILocalStorageDataInfo {
+func getTestingColumn(name string) *testColumn {
 	switch name {
 	case "Closed":
-		return &testColumn{name: name, valueType: priceData.DataValueType_Decimal}
+		return &testColumn{name: name, valueType: constants.DataValueType_Decimal, catalog: constants.ColumnCatalog_Basic}
 	}
 	return nil
 }
 func TestHappyPath(t *testing.T) {
 	ls := setupTestLocalStorage()
-
-	ls.Register(getTestingColumn("Closed"))
+	column := getTestingColumn("Closed")
+	ls.RegisterColumn(column.GetCatalog(), column.GetName(), column.GetValueType())
 
 	err := ls.LoadData("NVDA")
 	defer ls.Close()
 	assert.Nil(t, err)
 	assert.NotNil(t, ls.database)
 
+	sD := ls.GetLastDateOfColumn(column.GetCatalog(), column.GetName())
+	fmt.Println(sD.String())
+	// no data
+	assert.Equal(t, -1, sD.Year())
+}
+
+func BenchmarkGetLastDateOfColumn(b *testing.B) {
+
+	ls := setupTestLocalStorage()
+	column := getTestingColumn("Closed")
+	ls.RegisterColumn(column.GetCatalog(), column.GetName(), column.GetValueType())
+
+	ls.LoadData("NVDA")
+
+	defer ls.Close()
+
+	for n := 0; n <= b.N; n++ {
+		ls.GetLastDateOfColumn(column.GetCatalog(), column.GetName())
+
+	}
 }
