@@ -2,7 +2,7 @@ package localStorage
 
 import (
 	"MyTestingCode/constants"
-	"fmt"
+	"time"
 
 	"os"
 	"testing"
@@ -62,8 +62,13 @@ func (tc *testColumn) GetValueType() constants.DataValueType {
 }
 func getTestingColumn(name string) *testColumn {
 	switch name {
-	case "Closed":
+	// case "Closed":
+	// 	return &testColumn{name: name, valueType: constants.DataValueType_Decimal, catalog: constants.ColumnCatalog_Basic}
+	// case "Open":
+	// 	return &testColumn{name: name, valueType: constants.DataValueType_Decimal, catalog: constants.ColumnCatalog_Basic}
+	default:
 		return &testColumn{name: name, valueType: constants.DataValueType_Decimal, catalog: constants.ColumnCatalog_Basic}
+
 	}
 	return nil
 }
@@ -71,16 +76,22 @@ func TestHappyPath(t *testing.T) {
 	ls := setupTestLocalStorage()
 	column := getTestingColumn("Closed")
 	ls.RegisterColumn(column.GetCatalog(), column.GetName(), column.GetValueType())
-
+	column = getTestingColumn("Open")
+	ls.RegisterColumn(column.GetCatalog(), column.GetName(), column.GetValueType())
+	column = getTestingColumn("High")
+	ls.RegisterColumn(column.GetCatalog(), column.GetName(), column.GetValueType())
 	err := ls.LoadData("NVDA")
 	defer ls.Close()
 	assert.Nil(t, err)
 	assert.NotNil(t, ls.database)
 
 	sD := ls.GetLastDateOfColumn(column.GetCatalog(), column.GetName())
-	fmt.Println(sD.String())
 	// no data
-	assert.Equal(t, -1, sD.Year())
+	assert.Equal(t, 1, sD.Year())
+	assert.Equal(t, time.Month(1), sD.Month())
+
+	assert.Equal(t, 1, sD.Day())
+
 }
 
 func BenchmarkGetLastDateOfColumn(b *testing.B) {

@@ -151,9 +151,7 @@ func (ls *sqliteLocalStorage) GetLastDateOfColumn(catalog constants.ColumnCatalo
 	}
 	if maxDate.Valid {
 		v, _ := maxDate.Value()
-		println(v)
 		val := (int)(v.(int64))
-		println(val)
 		return time.Date(val/10000, (time.Month)((val%10000)/100), val%100, 0, 0, 0, 0, time.UTC)
 	} else {
 		return time.Time{}
